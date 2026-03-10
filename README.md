@@ -89,4 +89,8 @@ Lưu ý: UI trên trang chủ sử dụng fetch + FormData để gửi file, nê
 
 Nếu bạn muốn tôi cập nhật README để ghi rõ cách migrate dữ liệu, cách reset uploads hoặc ví dụ cụ thể hơn, cho biết yêu cầu cụ thể và tôi sẽ bổ sung.
 
+<<<<<<< HEAD
 Test branch protection 
+=======
+Update feature from develop branch 
+>>>>>>> 89907c70c148e2834b6c18eb9d9681017b729d29
