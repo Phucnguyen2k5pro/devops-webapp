@@ -1,0 +1,22 @@
+services:
+  web:
+    image: DOCKERHUB_USERNAME/devops-webapp:phase3-v1
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      - mongo
+    volumes:
+      - uploads_data:/app/public/uploads
+
+  mongo:
+    image: mongo:6.0
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
+  uploads_data:
