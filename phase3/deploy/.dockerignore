@@ -1,0 +1,12 @@
+node_modules
+.env
+.env.*
+logs
+public/uploads/*
+!public/uploads/.gitkeep
+.git
+.gitignore
+phase1
+phase2/evidence
+phase3/evidence
+deploy-src.tar.gz
