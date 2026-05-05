@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const ProductModel = require('../models/product');
 const fs = require('fs').promises;
 const path = require('path');
@@ -75,7 +75,7 @@ function createAppleProducts() {
   ];
 
   // attach UUID ids for in-memory use
-  return products.map(p => ({ id: uuidv4(), ...p }));
+  return products.map(p => ({ id: randomUUID(), ...p }));
 }
 
 async function init(useMongo) {
@@ -126,7 +126,7 @@ async function create(payload) {
     const doc = await ProductModel.create(payload);
     return toDTO(doc.toObject());
   }
-  const item = { id: uuidv4(), ...payload };
+  const item = { id: randomUUID(), ...payload };
   inMemory.push(item);
   return item;
 }
