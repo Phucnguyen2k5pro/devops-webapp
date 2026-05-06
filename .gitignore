@@ -1,10 +1,11 @@
 # Dependencies
 node_modules/
 
-# Environment files
+# Environment files - never commit real secrets
 .env
 .env.*
 !.env.example
+!**/.env.example
 
 # Logs
 logs/
@@ -13,20 +14,46 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Uploaded files
+# Uploaded runtime files
 public/uploads/*
 !public/uploads/.gitkeep
 
-# OS / Editor
+# OS / editor
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
-# Build / temp
+# Build / coverage / temp
 dist/
 build/
 coverage/
 tmp/
 temp/
 .cache/
+
+# Local-only deployment files
+deploy/docker-compose.local.yml
+deploy/Caddyfile.local
+.env.local
+.env.local.*
+devops-webapp-prod.tar.gz
+deploy-src.tar.gz
+
+# Archives should not be committed to source repo
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Private keys / credentials
+*.pem
+*.ppk
+*.key
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+
+# Docker temporary files
+docker-compose.override.yml
