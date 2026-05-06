@@ -19,7 +19,6 @@ jobs:
       contents: read
 
     outputs:
-      image: ${{ steps.image.outputs.image }}
       tag: ${{ steps.image.outputs.tag }}
 
     steps:
@@ -30,7 +29,6 @@ jobs:
         id: image
         run: |
           echo "tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "image=${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "Docker image will be: ${IMAGE_NAME}:${GITHUB_SHA}"
 
       - name: Setup Node.js 20 with npm cache
@@ -70,19 +68,19 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build Docker image with commit SHA tag
-        run: docker build --pull -t "${{ steps.image.outputs.image }}" .
+        run: docker build --pull -t "${{ env.IMAGE_NAME }}:${{ steps.image.outputs.tag }}" .
 
       - name: Run Trivy Docker image vulnerability scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ steps.image.outputs.image }}
+          image-ref: ${{ env.IMAGE_NAME }}:${{ steps.image.outputs.tag }}
           scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
 
       - name: Push Docker image to Docker Hub
-        run: docker push "${{ steps.image.outputs.image }}"
+        run: docker push "${{ env.IMAGE_NAME }}:${{ steps.image.outputs.tag }}"
 
   cd:
     name: CD - Deploy to Production Server
@@ -97,7 +95,7 @@ jobs:
       - name: Deploy production through SSH
         uses: appleboy/ssh-action@v1.2.0
         env:
-          WEB_IMAGE: ${{ needs.ci.outputs.image }}
+          WEB_IMAGE: docker.io/nguyenttphuc/devops-webapp:${{ needs.ci.outputs.tag }}
           PRODUCTION_DOMAIN: ${{ vars.PRODUCTION_DOMAIN }}
         with:
           host: ${{ secrets.SERVER_HOST }}
