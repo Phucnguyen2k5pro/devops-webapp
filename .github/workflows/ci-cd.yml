@@ -1,0 +1,142 @@
+name: CI/CD Production Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "20"
+  IMAGE_NAME: docker.io/nguyenttphuc/devops-webapp
+
+jobs:
+  ci:
+    name: CI - Lint, Build, Test, Scan, Docker Push
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+      tag: ${{ steps.image.outputs.tag }}
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set Docker image tag from commit SHA
+        id: image
+        run: |
+          echo "tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Docker image will be: ${IMAGE_NAME}:${GITHUB_SHA}"
+
+      - name: Setup Node.js 20 with npm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run build check
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run Trivy filesystem vulnerability scan
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          skip-dirs: node_modules
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker image with commit SHA tag
+        run: docker build --pull -t "${{ steps.image.outputs.image }}" .
+
+      - name: Run Trivy Docker image vulnerability scan
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.image }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Push Docker image to Docker Hub
+        run: docker push "${{ steps.image.outputs.image }}"
+
+  cd:
+    name: CD - Deploy to Production Server
+    runs-on: ubuntu-latest
+    needs: ci
+
+    # Phase 6: keep CD prepared but disabled.
+    # Phase 7: set repository variable ENABLE_PROD_DEPLOY=true.
+    if: ${{ vars.ENABLE_PROD_DEPLOY == 'true' }}
+
+    steps:
+      - name: Deploy production through SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          WEB_IMAGE: ${{ needs.ci.outputs.image }}
+          PRODUCTION_DOMAIN: ${{ vars.PRODUCTION_DOMAIN }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          envs: WEB_IMAGE,PRODUCTION_DOMAIN
+          script: |
+            set -Eeuo pipefail
+
+            cd /opt/devops-webapp
+
+            if [ ! -f .env ]; then
+              echo "ERROR: /opt/devops-webapp/.env does not exist"
+              exit 1
+            fi
+
+            if grep -q '^WEB_IMAGE=' .env; then
+              sed -i "s|^WEB_IMAGE=.*|WEB_IMAGE=${WEB_IMAGE}|" .env
+            else
+              echo "WEB_IMAGE=${WEB_IMAGE}" >> .env
+            fi
+
+            docker compose --env-file .env -f deploy/docker-compose.prod.yml pull app
+            docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d --remove-orphans
+
+            echo "Waiting for production health check..."
+
+            for i in $(seq 1 30); do
+              if curl -fsS "https://${PRODUCTION_DOMAIN}/health"; then
+                echo "Production health check passed"
+                exit 0
+              fi
+
+              echo "Health check not ready yet. Attempt ${i}/30"
+              sleep 5
+            done
+
+            echo "Production health check failed"
+            docker compose --env-file .env -f deploy/docker-compose.prod.yml ps
+            docker compose --env-file .env -f deploy/docker-compose.prod.yml logs --tail=100 app
+            exit 1
