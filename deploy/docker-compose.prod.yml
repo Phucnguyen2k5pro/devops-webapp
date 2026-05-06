@@ -3,14 +3,15 @@ services:
     image: ${WEB_IMAGE}
     container_name: devops-webapp-app
     restart: unless-stopped
+    expose:
+      - "3000"    
     environment:
       NODE_ENV: production
       PORT: 3000
       MONGO_URI: mongodb://mongo:27017/products_db
     volumes:
       - uploads_data:/app/public/uploads
-    expose:
-      - "3000"
+
     depends_on:
       mongo:
         condition: service_started
@@ -93,17 +94,23 @@ services:
       - monitoring_net
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
     container_name: devops-webapp-cadvisor
     restart: unless-stopped
     privileged: true
+    cgroup: host
     command:
       - "--housekeeping_interval=10s"
-      - "--docker_only=true"
+    devices:
+      - /dev/kmsg:/dev/kmsg
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run:/run:ro
+      - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
       - /sys:/sys:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
       - /var/lib/docker:/var/lib/docker:ro
       - /dev/disk:/dev/disk:ro
     expose:
